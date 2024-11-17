@@ -8,24 +8,11 @@
 with lib;
 
 let
-  inherit (builtins)
-    attrNames
-    head
-    map
-    match
-    readFile
-    ;
+  inherit (builtins) attrNames map match;
   inherit (lib) types;
   inherit (config.environment) etc;
   cfg = config.security.apparmor;
-  mkDisableOption =
-    name:
-    mkEnableOption name
-    // {
-      default = true;
-      example = false;
-    };
-  enabledPolicies = filterAttrs (n: p: p.enable) cfg.policies;
+  enabledPolicies = filterAttrs (n: p: p.state != "disable") cfg.policies;
 in
 
 {
@@ -69,15 +56,43 @@ in
         '';
         type = types.attrsOf (
           types.submodule (
-            { name, config, ... }:
+            {
+              name,
+              config,
+              options,
+              ...
+            }:
             {
               options = {
-                enable = mkDisableOption "loading of the profile into the kernel";
-                enforce = mkDisableOption "enforcing of the policy or only complain in the logs";
+                state = mkOption {
+                  description = "The state of the profile as applied to the system by nix";
+                  type = types.enum [
+                    "disable"
+                    "complain"
+                    "enforce"
+                  ];
+                  # should enforce really be the default?
+                  # the docs state that this should only be used once one is REALLY sure nothing's gonna break
+                  default = "enforce";
+                };
+
                 profile = mkOption {
-                  description = "The policy of the profile.";
+                  description = "The policy of the profile. Incompatible with path.";
                   type = types.lines;
-                  apply = pkgs.writeText name;
+                };
+
+                path = mkOption {
+                  type = types.nullOr types.path;
+                  default = null;
+                  description = "A path of a profile to include. Incompatible with profile.";
+                  apply =
+                    p:
+                    assert (
+                      assertMsg (
+                        (p != null && !options.profile.isDefined) || (p == null && options.profile.isDefined)
+                      ) "`security.apparmor.policies.\"${name}\"` must define exactly one of either path or profile."
+                    );
+                    (if (p != null) then p else (pkgs.writeText name config.profile));
                 };
               };
             }
@@ -136,7 +151,7 @@ in
       # because aa-remove-unknown reads profiles from all /etc/apparmor.d/*
       mapAttrsToList (name: p: {
         inherit name;
-        path = p.profile;
+        inherit (p) path;
       }) enabledPolicies
       ++ mapAttrsToList (name: path: { inherit name path; }) cfg.includes
     );
@@ -228,7 +243,8 @@ in
             xargs --verbose --no-run-if-empty --delimiter='\n' \
             kill
           '';
-          commonOpts = p: "--verbose --show-cache ${optionalString (!p.enforce) "--complain "}${p.profile}";
+          commonOpts =
+            p: "--verbose --show-cache ${optionalString (p.state == "complain") "--complain "}${p.path}";
         in
         {
           Type = "oneshot";
