@@ -1,24 +1,32 @@
 {
   lib,
   stdenv,
+  catch2,
   fetchFromGitHub,
   cmake,
+  gitUpdater,
 }:
 
 stdenv.mkDerivation rec {
   pname = "immer";
-  version = "0.8.0";
+  version = "0.8.1";
 
   src = fetchFromGitHub {
     owner = "arximboldi";
     repo = "immer";
-    rev = "v${version}";
-    hash = "sha256-R0C6hN50eyFSv10L/Q0tRdnUrRvze+eRXPrlAQsddYY=";
+    tag = "v${version}";
+    hash = "sha256-Tyj2mNyLhrcFNQEn4xHC8Gz7/jtA4Dnkjtk8AAXJEw8=";
   };
 
-  nativeBuildInputs = [ cmake ];
+  nativeBuildInputs = [
+    cmake
+    catch2
+  ];
+
   dontBuild = true;
   dontUseCmakeBuildDir = true;
+
+  passthru.updateScript = gitUpdater { };
 
   meta = with lib; {
     description = "Postmodern immutable and persistent data structures for C++ — value semantics at scale";
