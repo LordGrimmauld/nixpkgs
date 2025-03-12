@@ -4,6 +4,7 @@
   fetchFromGitHub,
   fetchpatch,
   fetchpatch2,
+  fetchurl,
   cmake,
   ninja,
   ffmpeg-headless,
@@ -76,8 +77,30 @@ stdenv.mkDerivation (finalAttrs: {
     tests.pkg-config = testers.testMetaPkgConfig finalAttrs.finalPackage;
   };
 
+  doCheck = true;
+  checkPhase =
+    let
+      exampleAudio = fetchurl {
+        # Sourced from http://freemusicarchive.org/music/Blue_Wave_Theory/Surf_Music_Month_Challenge/Skyhawk_Beach_fade_in
+        name = "Blue_Wave_Theory-Skyhawk_Beach.mp3";
+        url = "https://freemusicarchive.org/file/music/ccCommunity/Blue_Wave_Theory/Surf_Music_Month_Challenge/Blue_Wave_Theory_-_04_-_Skyhawk_Beach.mp3";
+        hash = "sha256-91VDWwrcP6Cw4rk72VHvZ8RGfRBrpRE8xo/02dcJhHc=";
+        meta.license = lib.licenses.cc-by-sa-40;
+      };
+
+      # sha256 because actual output of fpcalc is quite long
+      expectedHash = "81d848a94e5f0ddbe7ef0f45caab21269ef082cf8aab9ce3f0d1f1e026c1ce62";
+    in
+    ''
+      runHook preCheck
+      tests/all_tests
+      diff -u <(src/cmd/fpcalc ${exampleAudio} | sha256sum | cut -c-64) <(echo "${expectedHash}")
+      runHook postCheck
+    '';
+
   meta =
     {
+      changelog = "https://github.com/acoustid/chromaprint/releases/tag/v${finalAttrs.version}";
       homepage = "https://acoustid.org/chromaprint";
       description = "AcoustID audio fingerprinting library";
       license = lib.licenses.lgpl21Plus;
