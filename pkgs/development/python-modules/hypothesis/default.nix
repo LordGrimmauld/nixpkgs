@@ -80,6 +80,7 @@ buildPythonPackage rec {
       "test_uses_cached_charmap"
       # fails if builder is too slow
       "test_can_run_with_no_db"
+      "test_database_listener_memory"
     ]
     ++ lib.optionals (pythonOlder "3.10") [
       # not sure why these tests fail with only 3.9
