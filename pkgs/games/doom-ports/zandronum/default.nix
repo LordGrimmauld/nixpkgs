@@ -58,12 +58,12 @@ stdenv.mkDerivation {
       bzip2
       zlib
       SDL_compat
+      libGL
       libjpeg
       sqlite
       game-music-emu
     ]
     ++ lib.optionals (!serverOnly) [
-      libGL
       glew
       fmod
       fluidsynth
