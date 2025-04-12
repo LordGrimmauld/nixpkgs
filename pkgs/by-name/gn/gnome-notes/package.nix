@@ -4,22 +4,22 @@
   meson,
   ninja,
   gettext,
-  fetchurl,
-  fetchpatch,
+  fetchFromGitLab,
   pkg-config,
-  wrapGAppsHook3,
+  wrapGAppsHook4,
   itstool,
   desktop-file-utils,
   python3,
   glib,
-  gtk3,
+  gtk4,
   evolution-data-server,
   gnome-online-accounts,
   json-glib,
   libuuid,
   curl,
   libhandy,
-  webkitgtk_4_0,
+  libadwaita,
+  webkitgtk_6_0,
   gnome,
   adwaita-icon-theme,
   libxml2,
@@ -27,29 +27,25 @@
   tinysparql,
 }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "gnome-notes";
-  version = "40.1";
+  version = "40.1-unstable-2025-03-22";
 
-  src = fetchurl {
-    url = "mirror://gnome/sources/bijiben/${lib.versions.major version}/bijiben-${version}.tar.xz";
-    hash = "sha256-BaBvsGbpgC9fJKtnsNL3FFGGY2O6Pjn593X9SadYe78=";
+  src = fetchFromGitLab {
+    domain = "gitlab.gnome.org";
+    rev = "36ffedf40a933df45663e58963285869ec0cdb5a";
+    repo = "gnome-notes";
+    owner = "GNOME";
+    hash = "sha256-G1UmtaDWciwFoFsVzg0hi0tosMPuixYBzdcfDRVVHUY=";
   };
-
-  patches = [
-    # Fix build with meson 0.61
-    # data/appdata/meson.build:3:5: ERROR: Function does not take positional arguments.
-    (fetchpatch {
-      url = "https://gitlab.gnome.org/GNOME/gnome-notes/-/commit/994af76ce5144062d55d141129bf6bf5fab002ee.patch";
-      hash = "sha256-z7dPOLZzaqvdqUIDy6+V3dKossRbG0EDjBu2oJCF6b4=";
-    })
-  ];
-
+  
   doCheck = true;
 
   postPatch = ''
     chmod +x build-aux/meson_post_install.py
     patchShebangs build-aux/meson_post_install.py
+    substituteInPlace build-aux/meson_post_install.py \
+      --replace-fail "gtk-update-icon-cache" "gtk4-update-icon-cache"
   '';
 
   nativeBuildInputs = [
@@ -61,17 +57,19 @@ stdenv.mkDerivation rec {
     libxml2
     desktop-file-utils
     python3
-    wrapGAppsHook3
+    gtk4 # For `gtk-update-icon-cache`
+    wrapGAppsHook4
   ];
 
   buildInputs = [
     glib
-    gtk3
+    gtk4
     json-glib
     libuuid
     curl
+    libadwaita
     libhandy
-    webkitgtk_4_0
+    webkitgtk_6_0
     tinysparql
     gnome-online-accounts
     gsettings-desktop-schemas
