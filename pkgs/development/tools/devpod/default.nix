@@ -1,25 +1,24 @@
 {
   lib,
+  stdenv,
   buildGoModule,
-  copyDesktopItems,
-  darwin,
-  desktopToDarwinBundle,
+  rustPlatform,
   fetchFromGitHub,
   fetchYarnDeps,
-  gtk3,
+
+  cargo-tauri_1,
   installShellFiles,
-  jq,
+  makeBinaryWrapper,
+  nodejs,
+  pkg-config,
+  yarnConfigHook,
+
   libayatana-appindicator,
   libsoup_2_4,
-  makeDesktopItem,
-  mkYarnPackage,
   openssl,
-  pkg-config,
-  rust,
-  rustPlatform,
-  stdenv,
-  testers,
   webkitgtk_4_0,
+
+  testers,
 }:
 
 let
@@ -76,122 +75,80 @@ rec {
     };
   };
 
-  devpod-desktop =
-    let
-      frontend-build = mkYarnPackage {
-        inherit version;
-        pname = "devpod-frontend";
+  devpod-desktop = rustPlatform.buildRustPackage {
+    inherit version src;
+    pname = "devpod-desktop";
 
-        src = "${src}/desktop";
+    sourceRoot = "${src.name}/desktop";
 
-        offlineCache = fetchYarnDeps {
-          yarnLock = "${src}/desktop/yarn.lock";
-          hash = "sha256-vUV4yX+UvEKrP0vHxjGwtW2WyONGqHVmFor+WqWbkCc=";
-        };
+    offlineCache = fetchYarnDeps {
+      yarnLock = "${src}/desktop/yarn.lock";
+      hash = "sha256-vUV4yX+UvEKrP0vHxjGwtW2WyONGqHVmFor+WqWbkCc=";
+    };
 
-        packageJSON = ./package.json;
+    cargoRoot = "src-tauri";
+    buildAndTestSubdir = "src-tauri";
 
-        buildPhase = ''
-          export HOME=$(mktemp -d)
-          yarn --offline run build
+    useFetchCargoVendor = true;
+    cargoHash = "sha256-HD9b7OWilltL5Ymj28zoZwv5TJV3HT3LyCdagMqLH6E=";
 
-          cp -r deps/devpod/dist $out
-        '';
+    postPatch =
+      ''
+        ln -s ${lib.getExe devpod} src-tauri/bin/devpod-cli-${stdenv.hostPlatform.rust.rustcTarget}
 
-        doDist = false;
-        dontInstall = true;
-      };
+        # disable the button that symlinks the `devpod-cli` binary to ~/.local/bin/devpod
+        # we'll symlink it manually later to $out/bin/devpod
+        substituteInPlace src/components/useInstallCLI.tsx --replace-fail \
+          'isDisabled={status === "success"}>' \
+          'isDisabled={true}>'
 
-      rustTargetPlatformSpec = stdenv.hostPlatform.rust.rustcTarget;
-    in
-    rustPlatform.buildRustPackage {
-      inherit version src;
-      pname = "devpod-desktop";
-
-      sourceRoot = "${src.name}/desktop/src-tauri";
-
-      useFetchCargoVendor = true;
-      cargoHash = "sha256-HD9b7OWilltL5Ymj28zoZwv5TJV3HT3LyCdagMqLH6E=";
-
-      # Workaround:
-      #   The `tauri` dependency features on the `Cargo.toml` file does not match the allowlist defined under `tauri.conf.json`.
-      #   Please run `tauri dev` or `tauri build` or add the `updater` feature.
-      # Upstream is not interested in fixing that: https://github.com/loft-sh/devpod/pull/648
-      patches = [ ./add-tauri-updater-feature.patch ];
-
-      postPatch =
-        ''
-          ln -s ${devpod}/bin/devpod bin/devpod-cli-${rustTargetPlatformSpec}
-          cp -r ${frontend-build} frontend-build
-
-          substituteInPlace tauri.conf.json --replace '"distDir": "../dist",' '"distDir": "frontend-build",'
-        ''
-        + lib.optionalString stdenv.hostPlatform.isLinux ''
-          substituteInPlace $cargoDepsCopy/libappindicator-sys-*/src/lib.rs \
-            --replace "libayatana-appindicator3.so.1" "${libayatana-appindicator}/lib/libayatana-appindicator3.so.1"
-
-          # Since `cargo build` is used instead of `tauri build`, configs are merged manually.
-          jq --slurp '.[0] * .[1]' tauri.conf.json tauri-linux.conf.json >tauri.conf.json.merged
-          mv tauri.conf.json.merged tauri.conf.json
-        '';
-
-      nativeBuildInputs =
-        [
-          copyDesktopItems
-          pkg-config
-        ]
-        ++ lib.optionals stdenv.hostPlatform.isLinux [
-          jq
-        ]
-        ++ lib.optionals stdenv.hostPlatform.isDarwin [
-          desktopToDarwinBundle
-        ];
-
-      buildInputs =
-        [
-          libsoup_2_4
-          openssl
-        ]
-        ++ lib.optionals stdenv.hostPlatform.isLinux [
-          gtk3
-          libayatana-appindicator
-          webkitgtk_4_0
-        ]
-        ++ lib.optionals stdenv.hostPlatform.isDarwin [
-          darwin.apple_sdk.frameworks.Carbon
-          darwin.apple_sdk.frameworks.Cocoa
-          darwin.apple_sdk.frameworks.WebKit
-        ];
-
-      desktopItems = [
-        (makeDesktopItem {
-          name = "DevPod";
-          categories = [ "Development" ];
-          comment = "Spin up dev environments in any infra";
-          desktopName = "DevPod";
-          exec = "DevPod %U";
-          icon = "DevPod";
-          terminal = false;
-          type = "Application";
-          mimeTypes = [ "x-scheme-handler/devpod" ];
-        })
-      ];
-
-      postInstall = ''
-        ln -sf ${devpod}/bin/devpod $out/bin/devpod-cli
-        mv $out/bin/devpod-desktop $out/bin/DevPod
-
-        mkdir -p $out/share/icons/hicolor/{256x256@2,128x128,32x32}/apps
-        cp icons/128x128@2x.png $out/share/icons/hicolor/256x256@2/apps/DevPod.png
-        cp icons/128x128.png $out/share/icons/hicolor/128x128/apps/DevPod.png
-        cp icons/32x32.png $out/share/icons/hicolor/32x32/apps/DevPod.png
+        # don't show popup where it prompts you to press the above mentioned button
+        substituteInPlace src/client/client.ts --replace-fail \
+          'public async isCLIInstalled(): Promise<Result<boolean>> {' \
+          'public async isCLIInstalled(): Promise<Result<boolean>> { return Return.Value(true);'
+      ''
+      + lib.optionalString stdenv.hostPlatform.isLinux ''
+        substituteInPlace $cargoDepsCopy/libappindicator-sys-*/src/lib.rs \
+          --replace-fail "libayatana-appindicator3.so.1" "${libayatana-appindicator}/lib/libayatana-appindicator3.so.1"
       '';
 
-      meta = meta // {
-        mainProgram = "DevPod";
-        # darwin does not build
-        # https://github.com/h4llow3En/mac-notification-sys/issues/28
-        platforms = lib.platforms.linux;
-      };
+    nativeBuildInputs =
+      [
+        yarnConfigHook
+        nodejs
+        pkg-config
+        cargo-tauri_1.hook
+      ]
+      ++ lib.optionals stdenv.hostPlatform.isDarwin [
+        makeBinaryWrapper
+      ];
+
+    buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
+      libayatana-appindicator
+      libsoup_2_4
+      openssl
+      webkitgtk_4_0
+    ];
+
+    postInstall =
+      lib.optionalString stdenv.hostPlatform.isDarwin ''
+        # replace sidecar binary with symlink
+        ln -sf ${lib.getExe devpod} "$out/Applications/DevPod.app/Contents/MacOS/devpod-cli"
+
+        makeWrapper "$out"/Applications/DevPod.app/Contents/MacOS/DevPod "$out/bin/dev-pod"
+      ''
+      + lib.optionalString stdenv.hostPlatform.isLinux ''
+        # replace sidecar binary with symlink
+        ln -sf ${lib.getExe devpod} "$out/bin/devpod-cli"
+      ''
+      + ''
+        # propagate the `devpod` command
+        ln -s ${lib.getExe devpod} "$out/bin/devpod"
+      '';
+
+    meta = meta // {
+      mainProgram = "dev-pod";
+      platforms = lib.platforms.linux ++ lib.platforms.darwin;
     };
+  };
 }
