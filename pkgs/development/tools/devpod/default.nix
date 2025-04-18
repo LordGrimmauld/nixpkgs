@@ -6,7 +6,7 @@
   fetchFromGitHub,
   fetchYarnDeps,
 
-  cargo-tauri_1,
+  cargo-tauri,
   installShellFiles,
   makeBinaryWrapper,
   nodejs,
@@ -14,22 +14,23 @@
   yarnConfigHook,
 
   libayatana-appindicator,
-  libsoup_2_4,
   openssl,
-  webkitgtk_4_0,
+  webkitgtk_4_1,
+  jq,
+  moreutils,
 
   testers,
 }:
 
 let
   pname = "devpod";
-  version = "0.5.20";
+  version = "0.6.15";
 
   src = fetchFromGitHub {
     owner = "loft-sh";
     repo = pname;
     rev = "v${version}";
-    sha256 = "sha256-8LbqrOKC1als3Xm6ZuU2AySwT0UWjLN2xh+/CvioYew=";
+    sha256 = "sha256-fLUJeEwNDyzMYUEYVQL9XGQv/VAxjH4IZ1SJa6jx4Mw=";
   };
 
   meta = with lib; {
@@ -83,14 +84,14 @@ rec {
 
     offlineCache = fetchYarnDeps {
       yarnLock = "${src}/desktop/yarn.lock";
-      hash = "sha256-vUV4yX+UvEKrP0vHxjGwtW2WyONGqHVmFor+WqWbkCc=";
+      hash = "sha256-0Ov+Ik+th2IiuuqJyiO9t8vTyMqxDa9juEwbwHFaoi4=";
     };
 
     cargoRoot = "src-tauri";
     buildAndTestSubdir = "src-tauri";
 
     useFetchCargoVendor = true;
-    cargoHash = "sha256-HD9b7OWilltL5Ymj28zoZwv5TJV3HT3LyCdagMqLH6E=";
+    cargoHash = "sha256-BwuV5nAQcTAtdfK4+NKEt8Cj7gqnatRwHh/BYJJrIPo=";
 
     postPatch =
       ''
@@ -106,6 +107,13 @@ rec {
         substituteInPlace src/client/client.ts --replace-fail \
           'public async isCLIInstalled(): Promise<Result<boolean>> {' \
           'public async isCLIInstalled(): Promise<Result<boolean>> { return Return.Value(true);'
+
+        # disable upstream updater
+        jq \
+          '.plugins.updater.endpoints = [ ]
+          | .bundle.createUpdaterArtifacts = false' \
+          src-tauri/tauri.conf.json \
+          | sponge src-tauri/tauri.conf.json
       ''
       + lib.optionalString stdenv.hostPlatform.isLinux ''
         substituteInPlace $cargoDepsCopy/libappindicator-sys-*/src/lib.rs \
@@ -114,10 +122,12 @@ rec {
 
     nativeBuildInputs =
       [
+        jq
+        moreutils
         yarnConfigHook
         nodejs
         pkg-config
-        cargo-tauri_1.hook
+        cargo-tauri.hook
       ]
       ++ lib.optionals stdenv.hostPlatform.isDarwin [
         makeBinaryWrapper
@@ -125,9 +135,8 @@ rec {
 
     buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
       libayatana-appindicator
-      libsoup_2_4
       openssl
-      webkitgtk_4_0
+      webkitgtk_4_1
     ];
 
     postInstall =
