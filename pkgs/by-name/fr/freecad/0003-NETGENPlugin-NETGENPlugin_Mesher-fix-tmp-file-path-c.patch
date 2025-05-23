@@ -1,0 +1,33 @@
+From 9708e93a963b06260ce382e535c117d568f7c36e Mon Sep 17 00:00:00 2001
+From: Grimmauld <Grimmauld@grimmauld.de>
+Date: Fri, 23 May 2025 12:55:46 +0200
+Subject: [PATCH 3/4] NETGENPlugin - NETGENPlugin_Mesher: fix /tmp file path
+ concatenation
+
+Previously, FreeCAD attempted to write at apths in `/`,
+such as `/tmpNETGEN_3825524_190303824.out`.
+This was discovered while packaging netgen support for FreeCAD in nixpkgs [1].
+
+The fix is trivial: Just add to `/tmp/` to actually be in the tmp directory.
+
+[1] https://github.com/NixOS/nixpkgs/pull/408577#issuecomment-2904013103
+---
+ .../salomesmesh/src/NETGENPlugin/NETGENPlugin_Mesher.cpp        | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/3rdParty/salomesmesh/src/NETGENPlugin/NETGENPlugin_Mesher.cpp b/src/3rdParty/salomesmesh/src/NETGENPlugin/NETGENPlugin_Mesher.cpp
+index 2d43a3e08d..1bcaa15195 100644
+--- a/src/3rdParty/salomesmesh/src/NETGENPlugin/NETGENPlugin_Mesher.cpp
++++ b/src/3rdParty/salomesmesh/src/NETGENPlugin/NETGENPlugin_Mesher.cpp
+@@ -4187,7 +4187,7 @@ void NETGENPlugin_NetgenLibWrapper::setMesh( Ng_Mesh* mesh )
+ std::string NETGENPlugin_NetgenLibWrapper::getOutputFileName()
+ {
+ //  std::string aTmpDir = SALOMEDS_Tool::GetTmpDir();
+-  std::string aTmpDir = "/tmp";
++  std::string aTmpDir = "/tmp/";
+ 
+   TCollection_AsciiString aGenericName = (char*)aTmpDir.c_str();
+   aGenericName += "NETGEN_";
+-- 
+2.49.0
+
