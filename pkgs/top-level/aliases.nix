@@ -264,6 +264,7 @@ mapAliases {
   afl = throw "afl has been removed as the upstream project was archived. Consider using 'aflplusplus'"; # Added 2024-04-21
   afpfs-ng = throw "'afpfs-ng' has been removed as it was broken and unmaintained for 10 years"; # Added 2025-05-17
   agda-pkg = throw "agda-pkg has been removed due to being unmaintained"; # Added 2024-09-10"
+  airstrike = throw "'airstrike' has been removed as it was unmaintained upstream since 2005 and depended on deprecated libraries"; # Added 2025-06-07
   ajour = throw "ajour has been removed, the project was archived upstream on 2024-09-17."; # Added 2025-03-12
   akkoma-emoji = recurseIntoAttrs {
     blobs_gg = lib.warnOnInstantiate "'akkoma-emoji.blobs_gg' has been renamed to 'blobs_gg'" blobs_gg; # Added 2025-03-14
