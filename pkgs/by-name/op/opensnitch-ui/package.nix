@@ -11,6 +11,10 @@ python3Packages.buildPythonApplication {
   inherit (opensnitch) src version;
   sourceRoot = "${opensnitch.src.name}/ui";
 
+  patches = [
+    ./ignore-fourth-version-digit.patch
+  ];
+
   postPatch = ''
     substituteInPlace opensnitch/utils/__init__.py \
       --replace-fail /usr/lib/python3/dist-packages/data ${python3Packages.pyasn}/${python3Packages.python.sitePackages}/pyasn/data
