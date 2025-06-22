@@ -1,0 +1,15 @@
+diff --git a/audisp/audispd.c b/audisp/audispd.c
+index 2951aad2..f2adeac7 100644
+--- a/audisp/audispd.c
++++ b/audisp/audispd.c
+@@ -118,8 +118,8 @@ static void load_plugin_conf(conf_llist *plugin)
+ 			char fname[PATH_MAX];
+ 			const char *ext, *reason = NULL;
+ 
+-			if (e->d_type != DT_REG)
+-				reason = "not a regular file";
++			if (e->d_type != DT_REG || e->d_type != DT_LNK)
++				reason = "not a regular file or symlink";
+ 			else if (e->d_name[0] == '.')
+ 				reason = "hidden file";
+ 			else if (count_dots(e->d_name) > 1)

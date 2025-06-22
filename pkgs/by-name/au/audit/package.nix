@@ -26,6 +26,12 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-+M5Nai/ruK16udsHcMwv1YoVQbCLKNuz/4FCXaLbiCw=";
   };
 
+  patches = [
+    # nix configures most stuff by symlinks, e.g. in /etc
+    # thus, for plugins to be picked up, symlinks must be allowed
+    ./allow-symlink-plugin-configs.patch
+  ];
+
   postPatch = ''
     substituteInPlace bindings/swig/src/auditswig.i \
       --replace-fail "/usr/include/linux/audit.h" \
