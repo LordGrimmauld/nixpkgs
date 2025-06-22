@@ -4,14 +4,34 @@
   pkgs,
   ...
 }:
+let
+  cfg = config.security.auditd;
 
+  combined-plugin-packages = pkgs.buildEnv {
+    name = "auditd-plugins";
+    pathsToLink = [ "/etc/audit/plugins.d" ];
+    paths = cfg.plugins;
+    ignoreCollisions = true;
+  };
+in
 {
-  options.security.auditd.enable = lib.mkEnableOption "the Linux Audit daemon";
+  options.security.auditd = {
+    enable = lib.mkEnableOption "the Linux Audit daemon";
 
-  config = lib.mkIf config.security.auditd.enable {
+    plugins = lib.mkOption {
+      type = lib.types.listOf lib.types.package;
+      default = [ pkgs.audit.out ];
+      description = "plugin packages to register with auditd";
+    };
+  };
+
+  config = lib.mkIf cfg.enable {
     boot.kernelParams = [ "audit=1" ];
 
     environment.systemPackages = [ pkgs.audit ];
+
+    environment.etc."audit/plugins.d".source = "${combined-plugin-packages}/etc/audit/plugins.d";
+    environment.etc."audit/auditd.conf".source = "${pkgs.audit.out}/etc/audit/auditd.conf";
 
     systemd.services.auditd = {
       description = "Linux Audit daemon";
