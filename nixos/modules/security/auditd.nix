@@ -51,7 +51,8 @@ in
     security.auditd.config.plugin_dir = "/etc/audit/plugins.d";
 
     environment.etc."audit/plugins.d".source = "${combined-plugin-packages}/etc/audit/plugins.d";
-    environment.etc."audit/auditd.conf".text = configText;
+    # environment.etc."audit/auditd.conf".text = configText;
+    environment.etc."audit/auditd.conf".source = "${pkgs.audit.out}/etc/audit/auditd.conf";
 
     systemd.services.auditd = {
       description = "Linux Audit daemon";
