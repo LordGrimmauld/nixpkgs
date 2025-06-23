@@ -13,10 +13,28 @@ let
     paths = cfg.plugins;
     ignoreCollisions = true;
   };
+
+  prepareConfigValue = v: if lib.isBool v then (if v then "yes" else "no") else builtins.toString v;
+  configText = lib.concatLines (
+    lib.mapAttrsToList (k: v: "${k} = ${prepareConfigValue v}") cfg.config
+  );
 in
 {
   options.security.auditd = {
     enable = lib.mkEnableOption "the Linux Audit daemon";
+
+    config = lib.mkOption {
+      type =
+        with lib.types;
+        attrsOf (oneOf [
+          bool
+          nonEmptyStr
+          path
+          int
+        ]);
+      default = { };
+      description = "key/value pairs of config options o write to /etc/audit/auditd.conf";
+    };
 
     plugins = lib.mkOption {
       type = lib.types.listOf lib.types.package;
@@ -30,8 +48,10 @@ in
 
     environment.systemPackages = [ pkgs.audit ];
 
+    security.auditd.config.plugin_dir = "/etc/audit/plugins.d";
+
     environment.etc."audit/plugins.d".source = "${combined-plugin-packages}/etc/audit/plugins.d";
-    environment.etc."audit/auditd.conf".source = "${pkgs.audit.out}/etc/audit/auditd.conf";
+    environment.etc."audit/auditd.conf".text = configText;
 
     systemd.services.auditd = {
       description = "Linux Audit daemon";
