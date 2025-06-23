@@ -1,0 +1,15 @@
+diff --git a/lib/message.c b/lib/message.c
+index 2e20f76b..931e32f2 100644
+--- a/lib/message.c
++++ b/lib/message.c
+@@ -29,8 +29,8 @@
+ 
+ /* The message mode refers to where informational messages go
+    0 - stderr, 1 - syslog, 2 - quiet. The default is quiet. */
+-static message_t message_mode = MSG_QUIET;
+-static debug_message_t debug_message = DBG_NO;
++static message_t message_mode = MSG_SYSLOG;
++static debug_message_t debug_message = DBG_YES;
+ 
+ void set_aumessage_mode(message_t mode, debug_message_t debug)
+ {

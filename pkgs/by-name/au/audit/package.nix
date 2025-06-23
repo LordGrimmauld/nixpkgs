@@ -30,6 +30,8 @@ stdenv.mkDerivation (finalAttrs: {
     # nix configures most stuff by symlinks, e.g. in /etc
     # thus, for plugins to be picked up, symlinks must be allowed
     ./allow-symlink-plugin-configs.patch
+    # debug logs are not configured by config, and instead are baked in the code
+    ./write-debug-logs.patch
   ];
 
   postPatch = ''
