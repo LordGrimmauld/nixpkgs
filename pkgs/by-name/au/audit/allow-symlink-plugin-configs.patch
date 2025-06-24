@@ -1,23 +1,16 @@
 diff --git a/audisp/audispd.c b/audisp/audispd.c
-index 2951aad2..09300406 100644
+index 2951aad2..ba53a15c 100644
 --- a/audisp/audispd.c
 +++ b/audisp/audispd.c
-@@ -36,6 +36,7 @@
+@@ -36,6 +36,8 @@
  #include <arpa/inet.h>
  #include <limits.h>
  #include <sys/uio.h>
 +#include <sys/stat.h>
++#include <sys/syslog.h>
  #include <getopt.h>
  
  #include "audispd-pconfig.h"
-@@ -45,6 +46,7 @@
- #include "libaudit.h"
- #include "common.h"
- #include "private.h"
-+#include "sys/syslog.h"
- 
- /* Global Data */
- #ifdef HAVE_ATOMIC
 @@ -112,15 +114,30 @@ static void load_plugin_conf(conf_llist *plugin)
  	d = opendir(daemon_config.plugin_dir);
  	if (d) {
@@ -52,15 +45,8 @@ index 2951aad2..09300406 100644
  				reason = "hidden file";
  			else if (count_dots(e->d_name) > 1)
  				reason = "backup file";
-@@ -128,24 +145,28 @@ static void load_plugin_conf(conf_llist *plugin)
- 				reason = "file without .conf suffix";
- 
- 			if (reason) {
--				audit_msg(LOG_DEBUG, "Skipping %s plugin due to %s", e->d_name, reason);
-+				audit_msg(LOG_NOTICE, "Skipping %s plugin due to %s", e->d_name, reason);
+@@ -132,11 +149,9 @@ static void load_plugin_conf(conf_llist *plugin)
  				continue;
-+			} else {
-+				audit_msg(LOG_NOTICE, "Attempting %s plugin in %s", e->d_name, rp);
  			}
  
 -			snprintf(fname, sizeof(fname), "%s/%s",
@@ -72,12 +58,7 @@ index 2951aad2..09300406 100644
  				/* Push onto config list only if active */
  				if (config.active == A_YES)
  					plist_append(plugin, &config);
--				else
-+				else {
-+					audit_msg(LOG_NOTICE, "Found plugin %s, but not active", e->d_name);
- 					free_pconfig(&config);
-+				}
- 			} else
+@@ -146,6 +161,8 @@ static void load_plugin_conf(conf_llist *plugin)
  				audit_msg(LOG_ERR,
  					"Skipping %s plugin due to errors",
  					e->d_name);
