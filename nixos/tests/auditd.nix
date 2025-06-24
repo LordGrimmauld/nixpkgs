@@ -12,6 +12,7 @@
       security.audit.enable = true;
       security.auditd = {
         enable = true;
+        plugins.af_unix.active = true;
       };
 
       system.replaceDependencies.replacements =
@@ -28,30 +29,15 @@
               ../../pkgs/by-name/au/audit/allow-symlink-plugin-configs.patch
             ];
 
-            postInstall = ''
-              for plugin_def in $out/etc/audit/plugins.d/*.conf; do
-                substituteInPlace "$plugin_def" \
-                  --replace-fail "/sbin/" "$bin/bin/" \
-                  --replace-warn "active = no" "active = yes"
-              done
-            '';
+            env.NIX_CFLAGS_COMPILE = "-fsanitize=address";
           });
         in
-        builtins.concatMap
-          (
-            { oldDependency, newDependency }:
-            assert oldDependency.outputs == newDependency.outputs;
-            builtins.map (out: {
-              oldDependency = oldDependency.${out};
-              newDependency = newDependency.${out};
-            }) oldDependency.outputs
-          )
-          (
-            lib.singleton {
-              oldDependency = pkgs.audit;
-              newDependency = audit';
-            }
-          );
+        [
+          {
+            oldDependency = pkgs.audit.bin;
+            newDependency = audit'.bin;
+          }
+        ];
     };
 
   testScript = ''
