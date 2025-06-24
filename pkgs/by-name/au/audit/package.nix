@@ -29,9 +29,9 @@ stdenv.mkDerivation (finalAttrs: {
   patches = [
     # nix configures most stuff by symlinks, e.g. in /etc
     # thus, for plugins to be picked up, symlinks must be allowed
-    ./allow-symlink-plugin-configs.patch
+    # ./allow-symlink-plugin-configs.patch
     # debug logs are not configured by config, and instead are baked in the code
-    ./write-debug-logs.patch
+    # ./write-debug-logs.patch
   ];
 
   postPatch = ''
@@ -75,6 +75,12 @@ stdenv.mkDerivation (finalAttrs: {
     "--with-aarch64"
     (if enablePython then "--with-python" else "--without-python")
   ];
+
+  # postInstall = ''
+  #   for plugin_def in $out/etc/audit/plugins.d/*.conf; do
+  #     substituteInPlace "$plugin_def" --replace-fail "/sbin/" "$bin/bin/"
+  #   done
+  # '';
 
   enableParallelBuilding = true;
 

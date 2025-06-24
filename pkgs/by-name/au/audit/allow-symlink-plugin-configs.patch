@@ -1,5 +1,5 @@
 diff --git a/audisp/audispd.c b/audisp/audispd.c
-index 2951aad2..ee6282fa 100644
+index 2951aad2..09300406 100644
 --- a/audisp/audispd.c
 +++ b/audisp/audispd.c
 @@ -36,6 +36,7 @@
@@ -10,11 +10,19 @@ index 2951aad2..ee6282fa 100644
  #include <getopt.h>
  
  #include "audispd-pconfig.h"
-@@ -112,15 +113,30 @@ static void load_plugin_conf(conf_llist *plugin)
+@@ -45,6 +46,7 @@
+ #include "libaudit.h"
+ #include "common.h"
+ #include "private.h"
++#include "sys/syslog.h"
+ 
+ /* Global Data */
+ #ifdef HAVE_ATOMIC
+@@ -112,15 +114,30 @@ static void load_plugin_conf(conf_llist *plugin)
  	d = opendir(daemon_config.plugin_dir);
  	if (d) {
  		struct dirent *e;
-+		struct stat *s;
++		struct stat s;
  
  		while ((e = readdir(d))) {
  			plugin_conf_t config;
@@ -31,33 +39,45 @@ index 2951aad2..ee6282fa 100644
 +			if (e->d_type == DT_LNK) {
 +				rp = realpath(fname, NULL); // follow symlinks, use realpath to do plugin logic instead
 +			} else {
-+				rp = strdup(fname); // can't just set pointer using =, or free becomes undefined behavior
++				rp = strdup(fname); // can't just set pointer using =, or else free becomes undefined behavior
 +			}
 +
 +			if (rp == NULL)
 +				reason = "unable to allocate buffer";
-+			else if (lstat(rp, s) < 0) // need to check file type on the absolute path, which requires stat
++			else if (lstat(rp, &s) != 0) // need to check file type on the absolute path, which requires stat
 +				reason = "unable to stat";
-+			else if (!S_ISREG(s->st_mode))
++			else if (!S_ISREG(s.st_mode))
 +				reason = "not a regular file or symlink";
 +			else if (e->d_name[0] == '.') // name logic happens on the actual entry in the plugin directory
  				reason = "hidden file";
  			else if (count_dots(e->d_name) > 1)
  				reason = "backup file";
-@@ -132,11 +148,8 @@ static void load_plugin_conf(conf_llist *plugin)
+@@ -128,24 +145,28 @@ static void load_plugin_conf(conf_llist *plugin)
+ 				reason = "file without .conf suffix";
+ 
+ 			if (reason) {
+-				audit_msg(LOG_DEBUG, "Skipping %s plugin due to %s", e->d_name, reason);
++				audit_msg(LOG_NOTICE, "Skipping %s plugin due to %s", e->d_name, reason);
  				continue;
++			} else {
++				audit_msg(LOG_NOTICE, "Attempting %s plugin in %s", e->d_name, rp);
  			}
  
 -			snprintf(fname, sizeof(fname), "%s/%s",
 -				daemon_config.plugin_dir, e->d_name);
--
+ 
  			clear_pconfig(&config);
 -			if (load_pconfig(&config, fname) == 0) {
 +			if (load_pconfig(&config, rp) == 0) {
  				/* Push onto config list only if active */
  				if (config.active == A_YES)
  					plist_append(plugin, &config);
-@@ -146,6 +159,8 @@ static void load_plugin_conf(conf_llist *plugin)
+-				else
++				else {
++					audit_msg(LOG_NOTICE, "Found plugin %s, but not active", e->d_name);
+ 					free_pconfig(&config);
++				}
+ 			} else
  				audit_msg(LOG_ERR,
  					"Skipping %s plugin due to errors",
  					e->d_name);
