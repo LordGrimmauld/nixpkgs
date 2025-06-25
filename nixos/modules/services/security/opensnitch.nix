@@ -197,57 +197,78 @@ in
       )
     );
 
-    systemd = {
-      packages = [ pkgs.opensnitch ];
-      services.opensnitchd = {
-        wantedBy = [ "multi-user.target" ];
-        serviceConfig = {
-          ExecStart =
+    security.audit = lib.mkIf (cfg.settings.ProcMonitorMethod == "audit") {
+      enable = lib.mkDefault true; # can be "lock" too, which we don't want to override if explicitly set
+    };
+
+    systemd =
+      let
+        audit_enabled =
+          (cfg.enable && cfg.settings.ProcMonitorMethod == "audit")
+          -> (
+            (builtins.elem config.security.audit.enable [
+              true
+              "lock"
+            ])
+          );
+      in
+      assert (lib.assertMsg audit_enabled "audit `ProcMonitorMethod` requires `audit` to be enabled.");
+      {
+        packages = [ pkgs.opensnitch ];
+        services.opensnitchd = {
+          wantedBy = [ "multi-user.target" ];
+          path = lib.optionals (cfg.settings.ProcMonitorMethod == "audit") [ pkgs.audit ];
+          serviceConfig = {
+            ExecStart =
+              let
+                preparedSettings = removeAttrs cfg.settings (
+                  lib.optional (cfg.settings.ProcMonitorMethod != "ebpf") "Ebpf"
+                );
+              in
+              [
+                ""
+                "${pkgs.opensnitch}/bin/opensnitchd --config-file ${format.generate "default-config.json" preparedSettings}"
+              ];
+
+            # FIXME: THIS IS UNSAFE
+            CapabilityBoundingSet = "~";
+            AmbientCapabilities = "~";
+          };
+          preStart = lib.mkIf (cfg.rules != { }) (
             let
-              preparedSettings = removeAttrs cfg.settings (
-                lib.optional (cfg.settings.ProcMonitorMethod != "ebpf") "Ebpf"
+              rules = lib.flip lib.mapAttrsToList predefinedRules (
+                file: content: {
+                  inherit (content) file;
+                  local = "${cfg.settings.Rules.Path}/${file}.json";
+                }
               );
             in
-            [
-              ""
-              "${pkgs.opensnitch}/bin/opensnitchd --config-file ${format.generate "default-config.json" preparedSettings}"
-            ];
+            ''
+              # Remove all firewall rules from rules path (configured with
+              # cfg.settings.Rules.Path) that are symlinks to a store-path, but aren't
+              # declared in `cfg.rules` (i.e. all networks that were "removed" from
+              # `cfg.rules`).
+              find ${cfg.settings.Rules.Path} -type l -lname '${builtins.storeDir}/*' ${
+                lib.optionalString (rules != { }) ''
+                  -not \( ${
+                    lib.concatMapStringsSep " -o " ({ local, ... }: "-name '${baseNameOf local}*'") rules
+                  } \) \
+                ''
+              } -delete
+              ${lib.concatMapStrings (
+                { file, local }:
+                ''
+                  ln -sf '${file}' "${local}"
+                ''
+              ) rules}
+            ''
+          );
         };
-        preStart = lib.mkIf (cfg.rules != { }) (
-          let
-            rules = lib.flip lib.mapAttrsToList predefinedRules (
-              file: content: {
-                inherit (content) file;
-                local = "${cfg.settings.Rules.Path}/${file}.json";
-              }
-            );
-          in
-          ''
-            # Remove all firewall rules from rules path (configured with
-            # cfg.settings.Rules.Path) that are symlinks to a store-path, but aren't
-            # declared in `cfg.rules` (i.e. all networks that were "removed" from
-            # `cfg.rules`).
-            find ${cfg.settings.Rules.Path} -type l -lname '${builtins.storeDir}/*' ${
-              lib.optionalString (rules != { }) ''
-                -not \( ${
-                  lib.concatMapStringsSep " -o " ({ local, ... }: "-name '${baseNameOf local}*'") rules
-                } \) \
-              ''
-            } -delete
-            ${lib.concatMapStrings (
-              { file, local }:
-              ''
-                ln -sf '${file}' "${local}"
-              ''
-            ) rules}
-          ''
-        );
+        tmpfiles.rules = [
+          "d ${cfg.settings.Rules.Path} 0750 root root - -"
+          "L+ /etc/opensnitchd/system-fw.json - - - - ${pkgs.opensnitch}/etc/opensnitchd/system-fw.json"
+        ];
       };
-      tmpfiles.rules = [
-        "d ${cfg.settings.Rules.Path} 0750 root root - -"
-        "L+ /etc/opensnitchd/system-fw.json - - - - ${pkgs.opensnitch}/etc/opensnitchd/system-fw.json"
-      ];
-    };
 
   };
 

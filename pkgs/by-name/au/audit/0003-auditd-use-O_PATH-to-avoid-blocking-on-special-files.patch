@@ -1,0 +1,61 @@
+From b8a052ad602af2eb600fa70a2d0d51f33c10fbc2 Mon Sep 17 00:00:00 2001
+From: Grimmauld <Grimmauld@grimmauld.de>
+Date: Thu, 26 Jun 2025 15:35:04 +0200
+Subject: [PATCH 3/3] auditd: use O_PATH to avoid blocking on special files
+
+
+diff --git a/audisp/audispd-pconfig.c b/audisp/audispd-pconfig.c
+index 1479cbc9..2aa87453 100644
+--- a/audisp/audispd-pconfig.c
++++ b/audisp/audispd-pconfig.c
+@@ -31,6 +31,7 @@
+ #include <unistd.h>
+ #include <stdlib.h>
+ #include <libgen.h>
++#include <linux/limits.h>
+ #include "audispd-pconfig.h"
+ #include "private.h"
+ 
+@@ -143,12 +144,10 @@ int load_pconfig(plugin_conf_t *config, int dirfd, char *file)
+ 
+ 	clear_pconfig(config);
+ 
+-	/* O_NONBLOCK avoids blocking when opening a FIFO file accidentially.
+-	 * It does however block if someone symlinks /dev/ttyX into the plugin directory.
++	/* O_PATH avoids blocking, as no read/seek is done.
+ 	 * We do not pass O_NOFOLLOW, which allows for symlinked configs.
+ 	 */
+-	mode = O_RDONLY | O_NONBLOCK;
+-	rc = openat(dirfd, file, mode);
++	rc = openat(dirfd, file, O_PATH);
+ 	if (rc < 0) {
+ 		if (errno != ENOENT) {
+ 			audit_msg(LOG_ERR, "Error opening %s (%s)", file,
+@@ -190,13 +189,22 @@ int load_pconfig(plugin_conf_t *config, int dirfd, char *file)
+ 		return 1;
+ 	}
+ 
+-	if (fcntl(fd, F_SETFL, mode & (~O_NONBLOCK)) < 0) {
+-		audit_msg(LOG_ERR, "Error - Failed to remove nonblock flag for %s",
++	// reopen with read perms
++	char fname[PATH_MAX];
++	snprintf(fname, PATH_MAX, "/proc/self/fd/%i", fd);
++	mode = O_RDONLY;
++	rc = open(fname, mode);
++
++	if (rc < 0) {
++		audit_msg(LOG_ERR, "Error - Failed to reopen %s for reading",
+ 			file);
+ 		close(fd);
+ 		return 1;
+ 	}
+ 
++	close(fd);
++	fd = rc;
++
+ 	/* it's ok, read line by line */
+ 	f = fdopen(fd, "rm");
+ 	if (f == NULL) {
+-- 
+2.49.0
+

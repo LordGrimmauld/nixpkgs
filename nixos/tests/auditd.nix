@@ -13,6 +13,9 @@
       security.auditd = {
         enable = true;
         plugins.af_unix.active = true;
+        # plugins.remote.active = true; # needs configuring a remote server for logging
+        # plugins.filter.active = true; # needs configuring allowlist/denylist
+        plugins.syslog.active = true;
       };
 
       system.replaceDependencies.replacements =
@@ -25,8 +28,9 @@
               hash = "sha256-SgMt1MmcH7r7O6bmJCetRg3IdoZXAXjVJyeu0HRfyf8=";
             };
             patches = old.patches or [ ] ++ [
-              ../../pkgs/by-name/au/audit/write-debug-logs.patch
-              ../../pkgs/by-name/au/audit/allow-symlink-plugin-configs.patch
+              ../../pkgs/by-name/au/audit/0001-auditd-Avoid-blocking-on-open-syscall.patch
+              ../../pkgs/by-name/au/audit/0002-auditd-support-loading-plugin-configs-from-symlinks.patch
+              ../../pkgs/by-name/au/audit/0003-auditd-use-O_PATH-to-avoid-blocking-on-special-files.patch
             ];
 
             env.NIX_CFLAGS_COMPILE = "-fsanitize=address";

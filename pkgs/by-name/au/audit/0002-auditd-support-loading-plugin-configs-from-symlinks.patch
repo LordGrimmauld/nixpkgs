@@ -1,0 +1,55 @@
+From 50094f56fefc0b9033ef65e8c4f108ed52ef5de5 Mon Sep 17 00:00:00 2001
+From: Grimmauld <Grimmauld@grimmauld.de>
+Date: Wed, 25 Jun 2025 12:48:18 +0200
+Subject: [PATCH 2/3] auditd: support loading plugin configs from symlinks
+
+`auditd` previously did not support loading plugin configurations from
+symlinked config files. This is problematic on systems such as NixOS,
+which constructs basically the entirety of /etc using symlinks.
+
+I considered why symlinks were not supported, and concluded the reason was
+simplicity. While having a symlink point to a writable location would be
+insecure, a user putting an insecure symlink to trigger this behavior could
+also immediately do worse things.
+
+There also were edge cases if the config file is replaced between the file
+type check and the actual read. This is because `load_plugin_conf` uses
+path based logic to check whether a file is a regular file or not, and then
+asses the file path to `load_pconfig`. This means audispd would already
+load symlinked configs if a regular file was replaced by a symlink at
+precisely the right time in execution.
+
+`load_pconfig` opens the supplied config file path using `open`. Crucially,
+it does not set `O_NOFOLLOW`, meaning `load_pconfig` already supports
+loading plugin configs from symlinks. The check in `load_pconfig` also
+already uses the file-descriptor based `fstat` call, which mitigates the
+replacement problems: file descriptors are stable.
+
+This means, to support symlinks, it is sufficient to remove the check for
+regular files from `load_plugin_conf`. This does change internal API: It
+now is the responsibility of `load_pconfig` to make sure a plugin config
+file is a regular file. This API change is purely internal, neither
+`load_pconfig` nor `load_plugin_conf` are part of the public headers.
+
+This change has been tested against auditd 4.0.3 and 4.0.5 in a NixOS VM.
+The plugin config files af_unix.conf, au-remote.conf, filter.conf, syslog.conf
+all successfully loaded through symlink.
+
+diff --git a/audisp/audispd.c b/audisp/audispd.c
+index 0023c7b5..1e624b4c 100644
+--- a/audisp/audispd.c
++++ b/audisp/audispd.c
+@@ -123,9 +123,7 @@ static void load_plugin_conf(conf_llist *plugin)
+ 			plugin_conf_t config;
+ 			const char *ext, *reason = NULL;
+ 
+-			if (e->d_type != DT_REG)
+-				reason = "not a regular file";
+-			else if (e->d_name[0] == '.')
++			if (e->d_name[0] == '.')
+ 				reason = "hidden file";
+ 			else if (count_dots(e->d_name) > 1)
+ 				reason = "backup file";
+-- 
+2.49.0
+

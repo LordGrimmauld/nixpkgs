@@ -57,10 +57,23 @@ let
           the event into a string suitable for parsing with the audit parsing library.
         '';
       };
-      config_file = lib.mkOption {
-        type = lib.types.nullOr lib.types.pathInStore;
+      config = lib.mkOption {
+        type = lib.types.nullOr (
+          lib.types.submodule {
+            freeformType =
+              with lib.types;
+              attrsOf (
+                nullOr (oneOf [
+                  bool
+                  nonEmptyStr
+                  path
+                  int
+                ])
+              );
+          }
+        );
         default = null;
-        description = "the path to a plugin-specific config file to link to /etc/audit/<plugin>.conf";
+        description = "plugin-specific config file to link to /etc/audit/<plugin>.conf";
       };
     };
   };
@@ -150,12 +163,12 @@ in
       // (lib.mapAttrs' (
         n: v:
         lib.nameValuePair "audit/plugins.d/${n}.conf" {
-          text = prepareConfigText (lib.removeAttrs v [ "config_file" ]);
+          text = prepareConfigText (lib.removeAttrs v [ "config" ]);
         }
       ) cfg.plugins)
       // (lib.mapAttrs' (
-        n: v: lib.nameValuePair "audit/audisp-${n}.conf" { source = v.path; }
-      ) cfg.plugins);
+        n: v: lib.nameValuePair "audit/audisp-${n}.conf" { text = prepareConfigText v.config; }
+      ) (lib.filterAttrs (n: v: v.config != null) cfg.plugins));
 
     security.auditd.plugins = {
       af_unix = {
@@ -169,7 +182,7 @@ in
       };
       remote = {
         path = lib.getExe' pkgs.audit "audisp-remote";
-        config_file = "${pkgs.audit}/etc/audit/audisp-remote.conf";
+        config = { };
       };
       filter = {
         path = lib.getExe' pkgs.audit "audisp-filter";
@@ -181,7 +194,7 @@ in
           "LOG_INFO"
           "interpret"
         ];
-        config_file = "${pkgs.audit}/etc/audit/audisp-filter.conf";
+        config = { };
       };
       syslog = {
         path = lib.getExe' pkgs.audit "audisp-syslog";
