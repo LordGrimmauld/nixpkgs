@@ -48,5 +48,10 @@
     start_all()
     machine.wait_for_unit("auditd.service")
     machine.succeed("stat /var/run/audispd_events")
+    machine.succeed("systemctl stop auditd.service")
+    machine.fail("stat /var/run/audispd_events")
+    machine.succeed("systemctl start auditd.service")
+    machine.wait_for_unit("auditd.service")
+    machine.wait_for_file("/var/run/audispd_events")
   '';
 }
