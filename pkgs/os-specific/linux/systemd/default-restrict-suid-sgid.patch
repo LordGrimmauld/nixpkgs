@@ -1,0 +1,65 @@
+diff --git a/src/core/main.c b/src/core/main.c
+index 82d7551258..f84b36e5e0 100644
+--- a/src/core/main.c
++++ b/src/core/main.c
+@@ -801,6 +801,7 @@ static int parse_config_file(void) {
+                 { "Manager", "DefaultStartLimitInterval",    config_parse_sec,                   0,                        &arg_defaults.start_limit.interval}, /* obsolete alias */
+                 { "Manager", "DefaultStartLimitIntervalSec", config_parse_sec,                   0,                        &arg_defaults.start_limit.interval},
+                 { "Manager", "DefaultStartLimitBurst",       config_parse_unsigned,              0,                        &arg_defaults.start_limit.burst   },
++                { "Manager", "DefaultRestrictSUIDSGID",      config_parse_bool,                  0,                        &arg_defaults.restrict_suid_sgid  },
+                 { "Manager", "DefaultEnvironment",           config_parse_environ,               arg_runtime_scope,        &arg_default_environment          },
+                 { "Manager", "ManagerEnvironment",           config_parse_environ,               arg_runtime_scope,        &arg_manager_environment          },
+                 { "Manager", "DefaultLimitCPU",              config_parse_rlimit,                RLIMIT_CPU,               arg_defaults.rlimit               },
+diff --git a/src/core/manager.c b/src/core/manager.c
+index 4ccaba9054..da3784f9d5 100644
+--- a/src/core/manager.c
++++ b/src/core/manager.c
+@@ -4440,6 +4440,8 @@ int manager_set_unit_defaults(Manager *m, const UnitDefaults *defaults) {
+         m->defaults.timeout_abort_set = defaults->timeout_abort_set;
+         m->defaults.device_timeout_usec = defaults->device_timeout_usec;
+ 
++        m->defaults.restrict_suid_sgid = defaults->restrict_suid_sgid;
++
+         m->defaults.start_limit = defaults->start_limit;
+ 
+         m->defaults.cpu_accounting = defaults->cpu_accounting;
+diff --git a/src/core/manager.h b/src/core/manager.h
+index e4cada80ff..57a2f31228 100644
+--- a/src/core/manager.h
++++ b/src/core/manager.h
+@@ -166,6 +166,9 @@ typedef struct UnitDefaults {
+         RateLimit start_limit;
+ 
+         bool cpu_accounting;
++
++        bool restrict_suid_sgid;
++
+         bool memory_accounting;
+         bool io_accounting;
+         bool blockio_accounting;
+diff --git a/src/core/system.conf.in b/src/core/system.conf.in
+index 1c08aa4d22..05b333559f 100644
+--- a/src/core/system.conf.in
++++ b/src/core/system.conf.in
+@@ -80,5 +80,6 @@
+ #DefaultMemoryPressureWatch=auto
+ #DefaultOOMPolicy=stop
+ #DefaultSmackProcessLabel=
++#DefaultRestrictSUIDSGID=
+ #ReloadLimitIntervalSec=
+ #ReloadLimitBurst=
+diff --git a/src/core/unit.c b/src/core/unit.c
+index 0d88f4f641..f845a8f5ad 100644
+--- a/src/core/unit.c
++++ b/src/core/unit.c
+@@ -204,6 +204,10 @@ static void unit_init(Unit *u) {
+                          * still tune this value through their own unit file */
+                         (void) get_process_umask(0, &ec->umask);
+                 }
++
++                if (u->manager->defaults.restrict_suid_sgid) {
++                        ec->restrict_suid_sgid = true;
++                }
+         }
+ 
+         kc = unit_get_kill_context(u);

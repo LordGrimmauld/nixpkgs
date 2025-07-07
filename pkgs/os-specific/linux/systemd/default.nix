@@ -251,6 +251,8 @@ stdenv.mkDerivation (finalAttrs: {
       # because we include the config snippet manually
       ./0019-meson-Don-t-link-ssh-dropins.patch
       ./0020-install-unit_file_exists_full-follow-symlinks.patch
+
+      # ./default-restrict-suid-sgid.patch
     ]
     ++ lib.optionals (stdenv.hostPlatform.isLinux && stdenv.hostPlatform.isGnu) [
       ./0021-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch
