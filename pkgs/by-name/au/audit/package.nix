@@ -85,6 +85,7 @@ stdenv.mkDerivation (finalAttrs: {
     # capability dropping, currently mostly for plugins as those get spawned as root
     # see auditd-plugins(5)
     "--with-libcap-ng=yes"
+    # "--with-io_uring"
     (if enablePython then "--with-python" else "--without-python")
   ];
 
