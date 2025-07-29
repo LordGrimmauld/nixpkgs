@@ -202,7 +202,8 @@ in
       }
     ];
 
-    boot.kernelParams = [ "audit=1" ];
+    # Starting auditd should also enable loading the audit rules..
+    security.audit.enable = lib.mkDefault true;
 
     environment.systemPackages = [ pkgs.audit ];
 
@@ -258,7 +259,7 @@ in
     };
 
     systemd.services.auditd = {
-      description = "Linux Audit daemon";
+      description = "Security Audit Logging Service";
       documentation = [ "man:auditd(8)" ];
       wantedBy = [ "sysinit.target" ];
       after = [
@@ -272,16 +273,26 @@ in
       conflicts = [ "shutdown.target" ];
 
       unitConfig = {
-        ConditionVirtualization = "!container";
-        ConditionSecurity = [ "audit" ];
         DefaultDependencies = false;
+        RefuseManualStop = true;
+        ConditionVirtualization = "!container";
+        ConditionKernelCommandLine = [
+          "!audit=0"
+          "!audit=off"
+        ];
       };
 
-      path = [ pkgs.audit ];
-
       serviceConfig = {
-        ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /var/log/audit";
+        LogsDirectory = "audit";
         ExecStart = "${pkgs.audit}/bin/auditd -l -n -s nochange";
+        Restart = "on-failure";
+        # Do not restart for intentional exits. See EXIT CODES section in auditd(8).
+        RestartPreventExitStatus = "2 4 6";
+
+        # Upstream hardening settings
+        MemoryDenyWriteExecute = true;
+        LockPersonality = true;
+        RestrictRealtime = true;
       };
     };
   };
