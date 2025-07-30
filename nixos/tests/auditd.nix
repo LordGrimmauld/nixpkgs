@@ -31,6 +31,7 @@
 
   testScript = ''
     start_all()
+    machine.wait_for_unit("audit-rules.service")
     machine.wait_for_unit("auditd.service")
     machine.wait_for_unit("network.target") # netfilter test requires network
     machine.succeed("stat /var/run/audispd_events")
@@ -39,5 +40,9 @@
 
     # we need a valid session to which we can send commands, so we use run0
     machine.succeed("run0 --pty audit-testsuite-runner")
+
+    assert "enabled 1" in machine.succeed("auditctl -s")
+    machine.succeed("systemctl stop audit-rules.service")
+    assert "enabled 0" in machine.succeed("auditctl -s")
   '';
 }
