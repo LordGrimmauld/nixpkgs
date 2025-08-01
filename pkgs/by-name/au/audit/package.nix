@@ -2,7 +2,6 @@
   lib,
   stdenv,
   fetchFromGitHub,
-  fetchpatch,
   autoreconfHook,
   bash,
   buildPackages,
@@ -23,23 +22,16 @@
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname = "audit";
-  version = "4.1.1";
+  version = "4.1.1-unstable-2025-08-01";
 
   src = fetchFromGitHub {
     owner = "linux-audit";
     repo = "audit-userspace";
-    tag = "v${finalAttrs.version}";
-    hash = "sha256-gsG12XAmXZrq5ycCdDDdiqBb7qFdjaEXGbUSnmFaa8o=";
+    rev = "408b4001d4545606a33a25e1cb69088408bba3df";
+    hash = "sha256-mXDo/CCQioqgYNKygpJdERlDapHmYFHeeNw3xiD+V38=";
   };
 
   patches = [
-    # musl is missing a libgen.h include
-    # https://github.com/linux-audit/audit-userspace/pull/491
-    (fetchpatch {
-      url = "https://github.com/linux-audit/audit-userspace/commit/cc8752f4f91ee1ba231852d1a1030ecb5b4d6511.patch?full_index=1";
-      hash = "sha256-3SOEil7beaWzQJ/9am+T79HRKGD9n+YJ37aEYbVrBoI=";
-    })
-
     ./disable-legacy-actions.patch
   ];
 
@@ -89,6 +81,7 @@ stdenv.mkDerivation (finalAttrs: {
     "--with-arm"
     "--with-aarch64"
     "--with-io_uring"
+    "--runstatedir=/run"
     # capability dropping, currently mostly for plugins as those get spawned as root
     # see auditd-plugins(5)
     "--with-libcap-ng=yes"
@@ -113,7 +106,7 @@ stdenv.mkDerivation (finalAttrs: {
   meta = {
     homepage = "https://people.redhat.com/sgrubb/audit/";
     description = "Audit Library";
-    changelog = "https://github.com/linux-audit/audit-userspace/releases/tag/v${finalAttrs.version}";
+    changelog = "https://github.com/linux-audit/audit-userspace/releases/tag/v4.1.1";
     license = lib.licenses.gpl2Plus;
     maintainers = with lib.maintainers; [ grimmauld ];
     pkgConfigModules = [
