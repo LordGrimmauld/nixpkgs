@@ -39,6 +39,8 @@ stdenv.mkDerivation (finalAttrs: {
       url = "https://github.com/linux-audit/audit-userspace/commit/cc8752f4f91ee1ba231852d1a1030ecb5b4d6511.patch?full_index=1";
       hash = "sha256-3SOEil7beaWzQJ/9am+T79HRKGD9n+YJ37aEYbVrBoI=";
     })
+
+    ./disable-legacy-actions.patch
   ];
 
   postPatch = ''
@@ -83,6 +85,7 @@ stdenv.mkDerivation (finalAttrs: {
     # z/OS plugin is not useful on Linux, and pulls in an extra openldap
     # dependency otherwise
     "--disable-zos-remote"
+    "--disable-legacy-actions"
     "--with-arm"
     "--with-aarch64"
     "--with-io_uring"

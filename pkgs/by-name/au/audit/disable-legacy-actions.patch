@@ -1,0 +1,53 @@
+diff --git a/configure.ac b/configure.ac
+index d2e7c30f..85dbc188 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -235,6 +235,16 @@ AC_MSG_CHECKING(whether to include audisp ZOS remote plugin)
+ AM_CONDITIONAL(ENABLE_ZOS_REMOTE, test "x$enable_zos_remote" != "xno")
+ AC_MSG_RESULT($enable_zos_remote)
+ 
++# legacy actions
++AC_MSG_CHECKING(whether to install legacy actions)
++AC_ARG_ENABLE(legacy-actions,
++	      [AS_HELP_STRING([--disable-legacy-actions],
++			      [Disable legacy actions])],
++	      install_legacy_actions=$enableval,
++	      install_legacy_actions=yes)
++AM_CONDITIONAL(INSTALL_LEGACY_ACTIONS, test "x$install_legacy_actions" != "xno")
++AC_MSG_RESULT($install_legacy_actions)
++
+ #gssapi
+ AC_ARG_ENABLE(gssapi_krb5,
+ 	[AS_HELP_STRING([--enable-gssapi-krb5],[Enable GSSAPI Kerberos 5 support @<:@default=no@:>@])],
+diff --git a/init.d/Makefile.am b/init.d/Makefile.am
+index 064851b5..1f7e4a92 100644
+--- a/init.d/Makefile.am
++++ b/init.d/Makefile.am
+@@ -53,10 +53,14 @@ install-data-hook:
+ 
+ install-exec-hook:
+ 	mkdir -p ${DESTDIR}${initdir}
+-	mkdir -p ${DESTDIR}${legacydir}
+ 	mkdir -p ${DESTDIR}${sysconfdir}/bash_completion.d
+ 	$(INSTALL_SCRIPT) -D -m 644 ${builddir}/auditd.service ${DESTDIR}${initdir}
+ 	$(INSTALL_SCRIPT) -D -m 644 ${builddir}/audit-rules.service ${DESTDIR}${initdir}
++	chmod 0755 $(DESTDIR)$(sbindir)/augenrules
++	$(INSTALL_SCRIPT) -D -m 644 ${srcdir}/audit.bash_completion \
++		${DESTDIR}${sysconfdir}/bash_completion.d/
++if INSTALL_LEGACY_ACTIONS
++	mkdir -p ${DESTDIR}${legacydir}
+ 	$(INSTALL_SCRIPT) -D -m 750 ${srcdir}/auditd.rotate ${DESTDIR}${legacydir}/rotate
+ 	$(INSTALL_SCRIPT) -D -m 750 ${srcdir}/auditd.resume ${DESTDIR}${legacydir}/resume
+ 	$(INSTALL_SCRIPT) -D -m 750 ${srcdir}/auditd.reload ${DESTDIR}${legacydir}/reload
+@@ -64,9 +68,8 @@ install-exec-hook:
+ 	$(INSTALL_SCRIPT) -D -m 750 ${srcdir}/auditd.stop ${DESTDIR}${legacydir}/stop
+ 	$(INSTALL_SCRIPT) -D -m 750 ${srcdir}/auditd.restart ${DESTDIR}${legacydir}/restart
+ 	$(INSTALL_SCRIPT) -D -m 750 ${srcdir}/auditd.condrestart ${DESTDIR}${legacydir}/condrestart
+-	chmod 0755 $(DESTDIR)$(sbindir)/augenrules
+-	$(INSTALL_SCRIPT) -D -m 644 ${srcdir}/audit.bash_completion \
+-		${DESTDIR}${sysconfdir}/bash_completion.d/
++endif
++
+ uninstall-hook:
+ 	rm ${DESTDIR}${sysconfdir}/${libconfig}
+ 	rm ${DESTDIR}${initdir}/auditd.service
