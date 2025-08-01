@@ -149,7 +149,7 @@ in
             path = lib.getExe' pkgs.audit "audisp-af_unix";
             args = [
               "0640"
-              "/var/run/audispd_events"
+              "/run/audit/audispd_events"
               "string"
             ];
             format = "binary";
@@ -262,10 +262,6 @@ in
       description = "Security Audit Logging Service";
       documentation = [ "man:auditd(8)" ];
       wantedBy = [ "sysinit.target" ];
-      after = [
-        "local-fs.target"
-        "systemd-tmpfiles-setup.service"
-      ];
       before = [
         "sysinit.target"
         "shutdown.target"
@@ -284,6 +280,7 @@ in
 
       serviceConfig = {
         LogsDirectory = "audit";
+        RuntimeDirectory = "audit";
         ExecStart = "${pkgs.audit}/bin/auditd -l -n -s nochange";
         Restart = "on-failure";
         # Do not restart for intentional exits. See EXIT CODES section in auditd(8).
