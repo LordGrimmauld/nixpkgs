@@ -257,6 +257,14 @@ in
         should not be overridden.
       '';
     };
+
+    security.wrapperMetadataImage = lib.mkOption {
+      type = lib.types.path;
+      internal = true;
+      description = ''
+        This option defines the path to the erofs defining metadata for wrapper programs.
+      '';
+    };
   };
 
   ###### implementation
@@ -269,6 +277,25 @@ in
             setuid/setgid and capabilities are mutually exclusive.
       '';
     }) wrappers;
+
+    security.wrapperMetadataImage =
+      let
+        wrapperJson = pkgs.writeText "wrapper-json" (builtins.toJSON wrappers);
+        wrapperDump = pkgs.runCommandLocal "wrapper-dump" { } ''
+          PYTHONPATH=${./.} ${lib.getExe pkgs.buildPackages.python3} ${./build-composefs-dump.py} ${wrapperJson} > $out
+        '';
+      in
+      pkgs.runCommandLocal "wrapper-metadata.erofs"
+        {
+          nativeBuildInputs = with pkgs.buildPackages; [
+            composefs
+            erofs-utils
+          ];
+        }
+        ''
+          mkcomposefs --from-file ${wrapperDump} $out
+          fsck.erofs $out
+        '';
 
     security.wrappers =
       let
